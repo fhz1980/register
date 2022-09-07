@@ -267,6 +267,7 @@ public class FaceMainFrame {
 					photolable.setIcon(new ImageIcon(photoregister.getScaledInstance(180, 252, Image.SCALE_DEFAULT)));
 				}
 				camera.read(frame);
+				BufferedImage bufferedImage = ImageBlur.gausssianBlur(frame);
 				BufferedImage bi = fs.mat2BI(frame);
 
 				long currenttime = System.currentTimeMillis();
@@ -399,9 +400,8 @@ public class FaceMainFrame {
 				}
 				showImg = ImageUtils.deepCopy(bi);
 
-				ImageUtils.drawFace(showImg);
-
-				cameralable.setIcon(new ImageIcon(showImg));
+				ImageBlur.drawFace(bufferedImage,showImg.getSubimage(350,190,270,340));
+				cameralable.setIcon(new ImageIcon(bufferedImage));
 			}
 		}
 	}
