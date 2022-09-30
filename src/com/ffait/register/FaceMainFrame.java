@@ -1,10 +1,6 @@
 package com.ffait.register;
 
-import java.awt.Color;
-import java.awt.EventQueue;
-import java.awt.Font;
-import java.awt.Image;
-import java.awt.Toolkit;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
@@ -12,19 +8,19 @@ import java.io.File;
 import java.io.IOException;
 
 import javax.imageio.ImageIO;
-import javax.swing.ImageIcon;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
-import javax.swing.JButton;
+import javax.swing.*;
 
+import com.sun.jna.Native;
+import com.sun.jna.NativeLibrary;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.videoio.VideoCapture;
 
 import com.ffait.util.*;
+import uk.co.caprica.vlcj.binding.LibVlc;
+import uk.co.caprica.vlcj.component.EmbeddedMediaPlayerComponent;
+import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer;
+import uk.co.caprica.vlcj.runtime.RuntimeUtil;
 
 public class FaceMainFrame {
 	static {
@@ -59,6 +55,24 @@ public class FaceMainFrame {
 	static BufferedImage showImg = null;
 	static VideoCapture camera;
 	static JFrame frameThis;
+	//唤醒视频的时间，当前时间超过改时间的唤醒
+	static long wakeTime;
+	//已唤醒为true
+	static boolean wakeFlag = false;
+	//从配置文件中读取对应路径
+
+	/*
+	请使用无中文路径
+
+	需要播放的视频路径
+	VideoURL=D:\\test\\123.mp4
+	VLC安装目录，可以直接复制设备向导项目里的VLC文件夹
+	LibVlcLibraryName=D:\\soft\\VLC
+	*/
+
+	static String url = ParameterOperate.extract("VideoURL");
+	static String libVlcLibraryName = ParameterOperate.extract("LibVlcLibraryName");
+	static MyWindow myWindow;
 
 	public FaceMainFrame() {
 		initialize();
@@ -66,6 +80,12 @@ public class FaceMainFrame {
 
 	// 完善版本1.0
 	private void initialize() {
+		//vlc依赖加载
+		NativeLibrary.addSearchPath(
+				RuntimeUtil.getLibVlcLibraryName(), libVlcLibraryName);
+		Native.loadLibrary(RuntimeUtil.getLibVlcLibraryName(), LibVlc.class);
+
+
 		frame = new JFrame("培训注册系统");
 		frameThis = frame;
 		try {
@@ -255,6 +275,8 @@ public class FaceMainFrame {
 			}
 		});
 		pretime = System.currentTimeMillis();
+		//设置wakeTime
+		wakeTime = System.currentTimeMillis() + 30 * 60 * 1000;
 //		VideoCapture camera = new VideoCapture(0);
 		camera = new VideoCapture(0);
 
@@ -262,6 +284,7 @@ public class FaceMainFrame {
 			System.out.println("Camera Error");
 		} else {
 			Mat frame = new Mat();
+			//当前恒为0
 			while (flag == 0) {
 				if (photoregister != null) {
 					photolable.setIcon(new ImageIcon(photoregister.getScaledInstance(180, 252, Image.SCALE_DEFAULT)));
@@ -338,6 +361,9 @@ public class FaceMainFrame {
 									message.setText("未检测到人脸!");
 									// 返回值 !null：验证通过
 								} else if (null != s && "" != s) {
+									//关闭视频播放
+									stopVideo();
+
 									state = true;
 									registerName.setVisible(false);
 									registerId.setVisible(false);
@@ -397,6 +423,11 @@ public class FaceMainFrame {
 
 					}).start();
 					pretime = currenttime;
+
+					//每次人脸检测后检查wakeTime
+					if ( currenttime > wakeTime){
+						playVideo();
+					}
 				}
 				showImg = ImageUtils.deepCopy(bi);
 
@@ -404,6 +435,55 @@ public class FaceMainFrame {
 				cameralable.setIcon(new ImageIcon(bufferedImage));
 			}
 		}
+	}
+
+	public static void playVideo(){
+		if(!wakeFlag){
+			wakeFlag = true;
+			//新建窗口播放视频
+			myWindow = new MyWindow();
+			myWindow.setVisible(true);
+			myWindow.getMediaPlayer().prepareMedia(url);
+			myWindow.getMediaPlayer().play();
+		}
+	}
+	public static void stopVideo(){
+		//wakeTime重置并关闭窗口
+		wakeTime = System.currentTimeMillis() + 30*60*1000;
+		if(myWindow != null)
+			myWindow.dispose();
+		wakeFlag = false;
+	}
+	//窗口类
+	public static class MyWindow extends JWindow {
+
+		private static final long serialVersionUID = 1L;
+		private JPanel contentPane;
+		EmbeddedMediaPlayerComponent playerComponent;
+		private JPanel panel;
+
+		/**
+		 * Create the frame.
+		 */
+		public MyWindow() {
+
+			setSize(Toolkit.getDefaultToolkit().getScreenSize());
+//			setBounds(100, 100, 640, 480);
+			setAlwaysOnTop(true);
+			JPanel Videopanel = new JPanel();
+			add(Videopanel, BorderLayout.CENTER);
+			Videopanel.setLayout(new BorderLayout(0, 0));
+
+			playerComponent = new EmbeddedMediaPlayerComponent();
+			Videopanel.add(playerComponent);
+
+
+		}
+		public EmbeddedMediaPlayer getMediaPlayer() {
+
+			return playerComponent.getMediaPlayer();
+		}
+
 	}
 
 }
